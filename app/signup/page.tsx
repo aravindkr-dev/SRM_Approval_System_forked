@@ -20,7 +20,6 @@ const roleOptions = [
   { value: UserRole.CHAIRMAN, label: 'Chairman' },
 ];
 
-// Roles that require department field
 const rolesWithDepartment = [
   UserRole.REQUESTER,
   UserRole.DEAN,
@@ -40,19 +39,22 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const inputClass = 
+    "mt-1 block w-full border border-gray-400 rounded-lg px-3 py-2 " +
+    "bg-white shadow-sm placeholder-gray-500 text-gray-900 " +
+    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition";
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Basic validation
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    // Check if department is required for this role
     const isDepartmentRequired = rolesWithDepartment.includes(selectedRole);
 
     if (!name || !email || !password || !empId || !college || (isDepartmentRequired && !department)) {
@@ -64,9 +66,7 @@ export default function SignupPage() {
     try {
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           empId,
@@ -74,19 +74,18 @@ export default function SignupPage() {
           password,
           role: selectedRole,
           college,
-          department: rolesWithDepartment.includes(selectedRole) ? department : null,
+          department: isDepartmentRequired ? department : null,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Redirect to login page after successful signup
         router.push('/login?message=Signup successful. Please login.');
       } else {
         setError(data.error || 'Signup failed');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during signup');
     } finally {
       setLoading(false);
@@ -94,116 +93,99 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4 animate-fadeIn">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+
+        <div className="text-center">
+          <h2 className="text-4xl font-bold text-gray-900">
             Create an account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-gray-600 text-sm">
             Sign up for SRM-RMP Institutional Approval System
           </p>
         </div>
-        <div className="bg-white p-8 rounded-lg shadow">
+
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+
+          {error && (
+            <div className="bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm mb-4">
+              {error}
+            </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSignup}>
-            {error && (
-              <div className="bg-red-50 text-red-500 p-3 rounded-md text-sm">
-                {error}
-              </div>
-            )}
-            
+
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Full Name *</label>
               <input
-                id="name"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="John Doe"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label htmlFor="empId" className="block text-sm font-medium text-gray-700">
-                Employee ID *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Employee ID *</label>
               <input
-                id="empId"
                 type="text"
                 required
                 value={empId}
                 onChange={(e) => setEmpId(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="EMP12345"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Email Address *</label>
               <input
-                id="email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="you@example.com"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Password *</label>
               <input
-                id="password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="••••••••"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Confirm Password *</label>
               <input
-                id="confirmPassword"
                 type="password"
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="••••••••"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                Role *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">Role *</label>
               <select
-                id="role"
                 required
                 value={selectedRole}
                 onChange={(e) => {
                   const newRole = e.target.value as UserRole;
                   setSelectedRole(newRole);
-                  // Clear department if the new role doesn't need it
-                  if (!rolesWithDepartment.includes(newRole)) {
-                    setDepartment('');
-                  }
+                  if (!rolesWithDepartment.includes(newRole)) setDepartment('');
                 }}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className={inputClass}
               >
                 {roleOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -214,59 +196,52 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label htmlFor="college" className="block text-sm font-medium text-gray-700">
-                College *
-              </label>
+              <label className="block text-sm font-medium text-gray-700">College *</label>
               <input
-                id="college"
                 type="text"
                 required
                 value={college}
                 onChange={(e) => setCollege(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="Enter your college name"
+                className={inputClass}
               />
             </div>
 
             {rolesWithDepartment.includes(selectedRole) && (
               <div>
-                <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-                  Department *
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Department *</label>
                 <input
-                  id="department"
                   type="text"
                   required
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                   placeholder="Enter your department name"
+                  className={inputClass}
                 />
               </div>
             )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary"
-              >
-                {loading ? 'Creating account...' : 'Sign Up'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg font-medium shadow-md transition"
+            >
+              {loading ? 'Creating account...' : 'Sign Up'}
+            </button>
           </form>
-          
+
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
               <button
                 onClick={() => router.push('/login')}
-                className="font-medium text-primary-600 hover:text-primary-500"
+                className="text-blue-600 hover:text-blue-500 font-medium"
               >
                 Sign in
               </button>
             </p>
           </div>
+
         </div>
       </div>
     </div>

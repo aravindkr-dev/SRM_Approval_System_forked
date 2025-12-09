@@ -1,25 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { 
-  ClipboardDocumentListIcon, 
-  ClockIcon, 
-  CheckCircleIcon, 
-  ExclamationTriangleIcon 
-} from '@heroicons/react/24/outline';
+import { ClipboardDocumentListIcon, ClockIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import useSWR from 'swr';
 
-const fetcher = (url: string) => fetch(url, {
-  credentials: 'include'
-}).then(res => res.json());
+const fetcher = (url: string) =>
+  fetch(url, { credentials: 'include' }).then((res) => res.json());
 
 interface DashboardStats {
   totalRequests: number;
   pendingRequests: number;
   approvedRequests: number;
   rejectedRequests: number;
-  myRequests?: number;
-  pendingApprovals?: number;
 }
 
 export default function DashboardPage() {
@@ -31,119 +22,109 @@ export default function DashboardPage() {
       name: 'Total Requests',
       stat: stats?.totalRequests || 0,
       icon: ClipboardDocumentListIcon,
-      color: 'text-primary-600',
-      bgColor: 'bg-primary-50',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100',
     },
     {
       name: 'Pending',
       stat: stats?.pendingRequests || 0,
       icon: ClockIcon,
-      color: 'text-warning-600',
-      bgColor: 'bg-warning-50',
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100',
     },
     {
       name: 'Approved',
       stat: stats?.approvedRequests || 0,
       icon: CheckCircleIcon,
-      color: 'text-success-600',
-      bgColor: 'bg-success-50',
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
     },
     {
       name: 'Rejected',
       stat: stats?.rejectedRequests || 0,
       icon: ExclamationTriangleIcon,
-      color: 'text-danger-600',
-      bgColor: 'bg-danger-50',
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
     },
   ];
 
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">Error loading dashboard data</p>
+        <p className="text-red-600 font-medium">Error loading dashboard data</p>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="md:flex md:items-center md:justify-between">
+    <div className="animate-fadeIn">
+      {/* PAGE HEADER */}
+      <div className="md:flex md:items-center md:justify-between mb-8">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-            Dashboard
-          </h2>
+          <h2 className="text-4xl font-bold text-gray-900">Dashboard</h2>
+          <p className="mt-1 text-gray-500">Overview of your requests and activity</p>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="mt-8">
-        <dl className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {statsCards.map((item) => (
-            <div key={item.name} className="relative bg-white pt-5 px-4 pb-12 sm:pt-6 sm:px-6 shadow rounded-lg overflow-hidden">
-              <dt>
-                <div className={`absolute ${item.bgColor} rounded-md p-3`}>
-                  <item.icon className={`w-6 h-6 ${item.color}`} aria-hidden="true" />
-                </div>
-                <p className="ml-16 text-sm font-medium text-gray-500 truncate">{item.name}</p>
-              </dt>
-              <dd className="ml-16 pb-6 flex items-baseline sm:pb-7">
-                <p className="text-2xl font-semibold text-gray-900">{item.stat}</p>
-              </dd>
+      {/* STATS CARDS */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statsCards.map((item) => (
+          <div
+            key={item.name}
+            className="group bg-white/80 backdrop-blur-md shadow-lg rounded-2xl p-6 border border-gray-100 transition transform hover:scale-[1.02] hover:shadow-xl"
+          >
+            <div className={`w-14 h-14 flex items-center justify-center rounded-xl ${item.bgColor}`}>
+              <item.icon className={`w-8 h-8 ${item.color}`} />
             </div>
-          ))}
-        </dl>
+
+            <p className="mt-4 text-gray-600 font-medium">{item.name}</p>
+
+            <p className="text-4xl font-extrabold text-gray-900 mt-2 group-hover:scale-105 transition">
+              {item.stat}
+            </p>
+          </div>
+        ))}
       </div>
 
-      {/* Recent Requests */}
-      <div className="mt-8">
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Requests</h3>
-            {recentRequests?.requests ? (
-              <div className="mt-6 flow-root">
-                <ul className="-my-5 divide-y divide-gray-200">
-                  {recentRequests.requests.map((request: any) => (
-                    <li key={request._id} className="py-5">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {request.title}
-                          </p>
-                          <p className="text-sm text-gray-500 truncate">
-                            {request.college} • {request.department}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0">
-                          <span className={`status-badge ${getStatusClass(request.status)}`}>
-                            {request.status.replace('_', ' ').toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="mt-6 text-center py-4">
-                <p className="text-gray-500">No recent requests</p>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* RECENT REQUESTS */}
+      <div className="mt-10 bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">Recent Requests</h3>
+
+        {recentRequests?.requests?.length > 0 ? (
+          <ul className="divide-y divide-gray-200">
+            {recentRequests.requests.map((request: any) => (
+              <li key={request._id} className="py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">{request.title}</p>
+                  <p className="text-sm text-gray-500">
+                    {request.college} • {request.department}
+                  </p>
+                </div>
+
+                <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${getStatusClass(request.status)}`}>
+                  {request.status.replace('_', ' ').toUpperCase()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-center text-gray-500 py-6">No recent requests found</p>
+        )}
       </div>
     </div>
   );
 }
 
+/* STATUS COLORS */
 function getStatusClass(status: string) {
   switch (status) {
     case 'approved':
-      return 'status-approved';
+      return 'bg-green-100 text-green-700';
     case 'rejected':
-      return 'status-rejected';
+      return 'bg-red-100 text-red-700';
     case 'draft':
-      return 'status-draft';
+      return 'bg-gray-200 text-gray-700';
     default:
-      return 'status-pending';
+      return 'bg-yellow-100 text-yellow-700';
   }
 }

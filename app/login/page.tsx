@@ -20,9 +20,7 @@ export default function LoginPage() {
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
@@ -34,7 +32,7 @@ export default function LoginPage() {
       } else {
         setError(data.error || 'Login failed');
       }
-    } catch (error) {
+    } catch {
       setError('An error occurred during login');
     } finally {
       setLoading(false);
@@ -42,30 +40,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4">
+      <div className="max-w-md w-full space-y-8 animate-fadeIn">
+
+        {/* Title */}
+        <div className="text-center">
+          <h2 className="text-4xl font-extrabold text-gray-900 drop-shadow-sm">
             SRM-RMP Approval System
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to your account
-          </p>
+          <p className="mt-2 text-gray-600 text-sm">Sign in to your account</p>
         </div>
-        
+
+        {/* Optional Success Message */}
         {message && (
-          <div className="bg-green-50 text-green-500 p-3 rounded-md text-sm text-center">
+          <div className="bg-green-50 text-green-600 border border-green-200 p-3 rounded-md text-sm text-center">
             {message}
           </div>
         )}
-        
-        <div className="bg-white p-8 rounded-lg shadow">
+
+        {/* Login Card */}
+        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+
+          {/* Error message */}
           {error && (
-            <div className="bg-red-50 text-red-500 p-3 rounded-md text-sm mb-4">
+            <div className="bg-red-50 text-red-600 border border-red-200 p-3 rounded-md text-sm mb-4">
               {error}
             </div>
           )}
 
+          {/* Form */}
           <form className="space-y-6" onSubmit={handleAuthLogin}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -77,8 +80,10 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="you@example.com"
+                className="mt-1 block w-full border border-gray-400 rounded-lg px-3 py-2 bg-white shadow-sm
+                           placeholder-gray-500 text-gray-900
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               />
             </div>
 
@@ -92,41 +97,47 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                 placeholder="••••••••"
+                className="mt-1 block w-full border border-gray-400 rounded-lg px-3 py-2 bg-white shadow-sm
+                           placeholder-gray-500 text-gray-900
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
-                  Forgot your password?
-                </a>
-              </div>
-            </div>
-
-            <div>
+            {/* Forgot Password */}
+            <div className="text-right">
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary"
+                type="button"
+                onClick={() => router.push('/forgot-password')}
+                className="text-sm font-medium text-blue-600 hover:text-blue-500"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                Forgot your password?
               </button>
             </div>
+
+            {/* Sign In Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white py-3 rounded-lg font-medium shadow-md transition"
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
           </form>
 
+          {/* Signup Link */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
               <button
                 onClick={() => router.push('/signup')}
-                className="font-medium text-primary-600 hover:text-primary-500"
+                className="font-medium text-blue-600 hover:text-blue-500"
               >
                 Sign up
               </button>
             </p>
           </div>
+
         </div>
       </div>
     </div>
