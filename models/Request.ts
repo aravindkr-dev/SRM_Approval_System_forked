@@ -10,27 +10,44 @@ const approvalHistorySchema = new mongoose.Schema({
   attachments: [{ type: String }],
   previousStatus: { type: String, enum: Object.values(RequestStatus) },
   newStatus: { type: String, enum: Object.values(RequestStatus) },
+  // 🔹 Accountant budget trail (optional)
+  budgetAllocated: { type: Number },
+  budgetSpent: { type: Number },
+  budgetBalance: { type: Number },
   timestamp: { type: Date, default: Date.now },
 });
 
-const requestSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  purpose: { type: String, required: true },
-  college: { type: String, required: true },
-  department: { type: String, required: true },
-  costEstimate: { type: Number, required: true },
-  expenseCategory: { type: String, required: true },
-  sopReference: { type: String },
-  attachments: [{ type: String }],
-  requester: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  status: { 
-    type: String, 
-    enum: Object.values(RequestStatus), 
-    default: RequestStatus.SUBMITTED 
+const requestSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    purpose: { type: String, required: true },
+    college: { type: String, required: true },
+    department: { type: String, required: true },
+    costEstimate: { type: Number, required: true },
+    expenseCategory: { type: String, required: true },
+    sopReference: { type: String },
+    attachments: [{ type: String }],
+
+    // 🔹 NEW: Accountant budget fields (live values for current request)
+    budgetAllocated: { type: Number, default: 0 },
+    budgetSpent: { type: Number, default: 0 },
+    budgetBalance: { type: Number, default: 0 },
+
+    requester: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: Object.values(RequestStatus),
+      default: RequestStatus.SUBMITTED,
+    },
+    history: [approvalHistorySchema],
   },
-  history: [approvalHistorySchema],
-}, {
-  timestamps: true,
-});
+  {
+    timestamps: true,
+  }
+);
 
 export default mongoose.models.Request || mongoose.model('Request', requestSchema);

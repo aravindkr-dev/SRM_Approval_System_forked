@@ -15,26 +15,33 @@ interface UploadedFile {
   size: number;
 }
 
+/* GLOBAL CSS TO REMOVE NUMBER INPUT ARROWS */
+const removeNumberArrows = `
+  input::-webkit-outer-spin-button,
+  input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+`;
+
 export default function CreateRequestPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    getValues,
-  } = useForm<CreateRequestFormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<CreateRequestFormData>({
     resolver: zodResolver(CreateRequestSchema),
-    defaultValues: {
-      attachments: []
-    }
+    defaultValues: { attachments: [] }
   });
 
+  /* 🔹 FORM SUBMIT HANDLER */
   const onSubmit = async (data: CreateRequestFormData) => {
     setIsSubmitting(true);
     setError(null);
@@ -42,67 +49,69 @@ export default function CreateRequestPage() {
     try {
       const requestData = {
         ...data,
-        attachments: uploadedFiles.map(file => file.url)
+        attachments: uploadedFiles.map(file => file.url),
       };
 
       const response = await fetch('/api/requests', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create request');
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to create request');
       }
 
       const result = await response.json();
       router.push(`/dashboard/requests/${result._id}`);
     } catch (err) {
-      console.error('Error creating request:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /* 🔹 FILE UPLOAD HANDLER (PDF ONLY) */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files?.length) return;
+
+    const validFiles = [...files].filter(file => file.type === "application/pdf");
+
+    if (validFiles.length !== files.length) {
+      setError("Only PDF documents are allowed.");
+      return;
+    }
 
     setIsUploading(true);
     setError(null);
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        // Create FormData for upload
+      for (const file of validFiles) {
         const formData = new FormData();
         formData.append('file', file);
-        // Upload file
+
         const response = await fetch('/api/upload', {
           method: 'POST',
           credentials: 'include',
           body: formData,
         });
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to upload file');
+          const err = await response.json();
+          throw new Error(err.error || "Failed to upload file");
         }
-        const result = await response.json();
-        setUploadedFiles(prev => [...prev, result]);
+
+        const uploaded = await response.json();
+        setUploadedFiles(prev => [...prev, uploaded]);
       }
     } catch (err) {
-      console.error('Upload error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload file');
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -112,177 +121,156 @@ export default function CreateRequestPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+
+      {/* Inject CSS to remove number arrows */}
+      <style>{removeNumberArrows}</style>
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Create New Request</h1>
         <p className="text-gray-600">Fill in the details for your new request</p>
       </div>
+
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-red-800">{error}</p>
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
+          {error}
         </div>
       )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
+        {/* FORM FIELDS */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+
+          {/* Title */}
           <div className="sm:col-span-2">
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-              Title
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Title</label>
             <input
               type="text"
-              id="title"
-              {...register('title')}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              {...register("title")}
+              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.title && (
-              <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
-            )}
+            {errors.title && <p className="text-red-600 text-sm">{errors.title.message}</p>}
           </div>
+
+          {/* Purpose */}
           <div className="sm:col-span-2">
-            <label htmlFor="purpose" className="block text-sm font-medium text-gray-700">
-              Purpose
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Purpose</label>
             <textarea
-              id="purpose"
               rows={4}
-              {...register('purpose')}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              {...register("purpose")}
+              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.purpose && (
-              <p className="mt-1 text-sm text-red-600">{errors.purpose.message}</p>
-            )}
+            {errors.purpose && <p className="text-red-600 text-sm">{errors.purpose.message}</p>}
           </div>
+
+          {/* College */}
           <div>
-            <label htmlFor="college" className="block text-sm font-medium text-gray-700">
-              College
-            </label>
+            <label className="block text-sm font-medium text-gray-700">College</label>
             <input
               type="text"
-              id="college"
-              {...register('college')}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              {...register("college")}
+              className="mt-1 block w-full rounded-md border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.college && (
-              <p className="mt-1 text-sm text-red-600">{errors.college.message}</p>
-            )}
           </div>
+
+          {/* Department */}
           <div>
-            <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-              Department
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Department</label>
             <input
               type="text"
-              id="department"
-              {...register('department')}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              {...register("department")}
+              className="mt-1 block w-full rounded-md border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.department && (
-              <p className="mt-1 text-sm text-red-600">{errors.department.message}</p>
-            )}
           </div>
+
+          {/* Cost Estimate */}
           <div>
-            <label htmlFor="costEstimate" className="block text-sm font-medium text-gray-700">
-              Cost Estimate (₹)
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Cost Estimate (₹)</label>
             <input
               type="number"
-              id="costEstimate"
-              {...register('costEstimate', { valueAsNumber: true })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              inputMode="decimal"
+              {...register("costEstimate", { valueAsNumber: true })}
+              className="mt-1 block w-full rounded-md border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.costEstimate && (
-              <p className="mt-1 text-sm text-red-600">{errors.costEstimate.message}</p>
-            )}
           </div>
+
+          {/* Expense Category */}
           <div>
-            <label htmlFor="expenseCategory" className="block text-sm font-medium text-gray-700">
-              Expense Category
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Expense Category</label>
             <input
               type="text"
-              id="expenseCategory"
-              {...register('expenseCategory')}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              {...register("expenseCategory")}
+              className="mt-1 block w-full rounded-md border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.expenseCategory && (
-              <p className="mt-1 text-sm text-red-600">{errors.expenseCategory.message}</p>
-            )}
           </div>
+
+          {/* SOP Reference */}
           <div className="sm:col-span-2">
-            <label htmlFor="sopReference" className="block text-sm font-medium text-gray-700">
-              SOP Reference (Optional)
-            </label>
+            <label className="block text-sm font-medium text-gray-700">SOP Reference (Optional)</label>
             <input
               type="text"
-              id="sopReference"
-              {...register('sopReference')}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+              {...register("sopReference")}
+              className="mt-1 block w-full rounded-md border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
-            {errors.sopReference && (
-              <p className="mt-1 text-sm text-red-600">{errors.sopReference.message}</p>
-            )}
           </div>
         </div>
-        {/* Document Attachments Section */}
-        <div className="sm:col-span-2">
+
+        {/* DOCUMENT UPLOAD */}
+        <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">
-              Document Attachments
-            </label>
+            <label className="text-sm font-medium text-gray-700">Document Attachments (PDF Only)</label>
             <input
               type="file"
+              accept="application/pdf"
               ref={fileInputRef}
               onChange={handleFileChange}
               multiple
               className="hidden"
-              disabled={isUploading}
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="text-sm text-blue-600 hover:text-blue-800 disabled:opacity-50"
+              className="text-blue-600 hover:text-blue-800 text-sm"
             >
-              {isUploading ? 'Uploading...' : '+ Add Document'}
+              {isUploading ? "Uploading..." : "+ Add Document"}
             </button>
           </div>
+
           {uploadedFiles.length > 0 ? (
             <ul className="border rounded-md divide-y">
-              {uploadedFiles.map((file, index) => (
-                <li key={index} className="flex justify-between items-center p-2">
-                  <span className="text-sm truncate flex-1 mr-2">{file.filename}</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFile(index)}
-                      className="text-red-500 hover:text-red-700 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
+              {uploadedFiles.map((file, i) => (
+                <li key={i} className="flex justify-between items-center p-2">
+                  <span className="text-sm flex-1 truncate">{file.filename}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(i)}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    Remove
+                  </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">No files uploaded</p>
+            <p className="text-gray-500 text-sm">No files uploaded</p>
           )}
         </div>
+
+        {/* BUTTONS */}
         <div className="flex justify-end space-x-4">
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating...' : 'Create Request'}
+            {isSubmitting ? "Creating..." : "Create Request"}
           </button>
         </div>
       </form>

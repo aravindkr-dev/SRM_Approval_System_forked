@@ -24,8 +24,7 @@ export async function GET(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    // Check if user has permission to view this request
-    // Allow all roles that participate in the approval process to view requests
+    // Allowed roles to view request
     const allowedRoles = [
       UserRole.REQUESTER,
       UserRole.INSTITUTION_MANAGER,
@@ -42,8 +41,9 @@ export async function GET(
       UserRole.CHAIRMAN
     ];
 
-    const canViewRequest = allowedRoles.includes(user.role) || 
-                          requestRecord.requester._id.toString() === user.id;
+    const canViewRequest =
+      allowedRoles.includes(user.role) ||
+      requestRecord.requester._id.toString() === user.id;
 
     if (!canViewRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -69,7 +69,47 @@ export async function PUT(
     }
 
     const body = await request.json();
-    
+
+    // --------------------------------------------
+    // ✅ Only accountants can update budget fields
+    // --------------------------------------------
+    if (user.role === UserRole.ACCOUNTANT) {
+      const updateFields: any = {};
+
+      if (typeof body.budgetAllocated === "number") {
+        updateFields.budgetAllocated = body.budgetAllocated;
+      }
+
+      if (typeof body.budgetSpent === "number") {
+        updateFields.budgetSpent = body.budgetSpent;
+      }
+
+      // Auto-calc balance
+      if (updateFields.budgetAllocated !== undefined || updateFields.budgetSpent !== undefined) {
+        const allocated = updateFields.budgetAllocated ?? body.budgetAllocated;
+        const spent = updateFields.budgetSpent ?? body.budgetSpent;
+        updateFields.budgetBalance = allocated - spent;
+      }
+
+      const updatedRequest = await Request.findByIdAndUpdate(
+        params.id,
+        { $set: updateFields },
+        { new: true }
+      ).populate('requester', 'name email');
+
+      if (!updatedRequest) {
+        return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+      }
+
+      return NextResponse.json(updatedRequest);
+    }
+
+    // -------------------------------------------------
+    // ❗ All other roles can update ONLY non-budget data
+    // -------------------------------------------------
+    const disallowedKeys = ["budgetAllocated", "budgetSpent", "budgetBalance"];
+    disallowedKeys.forEach((key) => delete body[key]);
+
     const updatedRequest = await Request.findByIdAndUpdate(
       params.id,
       { ...body },
@@ -81,6 +121,7 @@ export async function PUT(
     }
 
     return NextResponse.json(updatedRequest);
+
   } catch (error) {
     console.error('Update request error:', error);
     return NextResponse.json({ error: 'Failed to update request' }, { status: 500 });

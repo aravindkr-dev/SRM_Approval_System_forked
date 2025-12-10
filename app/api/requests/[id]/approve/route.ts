@@ -13,145 +13,189 @@ export async function POST(
   try {
     await connectDB();
     const user = await getCurrentUser();
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-  const { action, notes, budgetAvailable, forwardedMessage, attachments, target } = await request.json();
-    
+    const {
+      action,
+      notes,
+      budgetAllocated,
+      budgetSpent,
+      budgetAvailable,
+      forwardedMessage,
+      attachments,
+      target,
+      sopReference,
+    } = await request.json();
+
     // Validate action
     if (!['approve', 'reject', 'clarify', 'forward'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    // Find the request
     const requestRecord = await Request.findById(params.id);
+
     if (!requestRecord) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    // Check if user is authorized to approve this request
-    const requiredApprovers = approvalEngine.getRequiredApprover(requestRecord.status);
+    // Role check
+    const requiredApprovers = approvalEngine.getRequiredApprover(
+      requestRecord.status
+    );
+
     if (!requiredApprovers.includes(user.role as UserRole)) {
-      return NextResponse.json({ error: 'Not authorized to approve this request' }, { status: 403 });
+      return NextResponse.json(
+        { error: 'Not authorized to approve this request' },
+        { status: 403 }
+      );
     }
 
-    // Store previous status for history tracking
     const previousStatus = requestRecord.status;
 
-    // Determine next status based on action
     let nextStatus = requestRecord.status;
     let actionType = ActionType.APPROVE;
-    
+
+    // Handle different actions
     switch (action) {
+
       case 'approve':
-        // Get next status based on approval rules
-        nextStatus = approvalEngine.getNextStatus(
-          requestRecord.status, 
-          ActionType.APPROVE, 
-          user.role as UserRole,
-          { budgetAvailable }
-        ) || requestRecord.status;
+        nextStatus =
+          approvalEngine.getNextStatus(
+            requestRecord.status,
+            ActionType.APPROVE,
+            user.role as UserRole,
+            { budgetAvailable }
+          ) || requestRecord.status;
         actionType = ActionType.APPROVE;
         break;
-        
+
       case 'reject':
         nextStatus = RequestStatus.REJECTED;
         actionType = ActionType.REJECT;
         break;
-        
+
       case 'clarify':
-        // For Institution Manager clarification, determine which step to clarify
         if (user.role === UserRole.INSTITUTION_MANAGER && target) {
-          // Use approval engine to determine next status based on target
-          nextStatus = approvalEngine.getNextStatus(
-            requestRecord.status,
-            ActionType.CLARIFY,
-            user.role as UserRole,
-            { clarificationType: target }
-          ) || requestRecord.status;
+          nextStatus =
+            approvalEngine.getNextStatus(
+              requestRecord.status,
+              ActionType.CLARIFY,
+              user.role as UserRole,
+              { clarificationType: target }
+            ) || requestRecord.status;
         } else if (user.role === UserRole.DEAN && target) {
-          // Dean clarification with department users
-          nextStatus = approvalEngine.getNextStatus(
-            requestRecord.status,
-            ActionType.CLARIFY,
-            user.role as UserRole,
-            { clarificationType: 'department' }
-          ) || requestRecord.status;
+          nextStatus =
+            approvalEngine.getNextStatus(
+              requestRecord.status,
+              ActionType.CLARIFY,
+              user.role as UserRole,
+              { clarificationType: 'department' }
+            ) || requestRecord.status;
         } else {
           nextStatus = RequestStatus.CLARIFICATION_REQUIRED;
         }
         actionType = ActionType.CLARIFY;
         break;
-        
+
       case 'forward':
-        // Use approval engine to determine next status for forward action
-        nextStatus = approvalEngine.getNextStatus(
-          requestRecord.status,
-          ActionType.FORWARD,
-          user.role as UserRole,
-          { }
-        ) || requestRecord.status;
+        nextStatus =
+          approvalEngine.getNextStatus(
+            requestRecord.status,
+            ActionType.FORWARD,
+            user.role as UserRole,
+            {}
+          ) || requestRecord.status;
         actionType = ActionType.FORWARD;
         break;
     }
 
-    // Prepare history entry
-    const historyEntry: any = {
-  action: actionType,
-  actor: user.id,
-  previousStatus: previousStatus,
-  newStatus: nextStatus, // Always use the actual nextStatus
-  timestamp: new Date(),
-  ...(action === 'clarify' && target ? { target } : {}),
-    };
-
-    // Add appropriate fields based on action type
-    if (action === 'forward') {
-      historyEntry.forwardedMessage = forwardedMessage || notes || '';
-      if (attachments && attachments.length > 0) {
-        historyEntry.attachments = attachments;
-      }
-    } else {
-      if (notes) {
-        historyEntry.notes = notes;
-      }
-      if (budgetAvailable !== undefined) {
-        historyEntry.budgetAvailable = budgetAvailable;
-      }
+    // 🔹 **SPECIAL FIX — VP → HOI**
+    if (
+      user.role === UserRole.VP &&
+      requestRecord.status === RequestStatus.VP_APPROVAL
+    ) {
+      nextStatus = RequestStatus.HOI_APPROVAL;
     }
 
-    // Update request with new status and history
-    const updateData: any = {
-      $push: {
-        history: historyEntry
-      }
+    // 🔹 SOP stores reference number
+    if (user.role === UserRole.SOP_VERIFIER && sopReference) {
+      requestRecord.sopReference = sopReference;
+      await requestRecord.save();
+    }
+
+    // BUILD HISTORY ENTRY
+    const historyEntry: any = {
+      action: actionType,
+      actor: user.id,
+      previousStatus,
+      newStatus: nextStatus,
+      timestamp: new Date(),
     };
 
-    // Update status if it actually changed
+    if (action === 'forward') {
+      historyEntry.forwardedMessage = forwardedMessage || notes || '';
+      if (attachments?.length) historyEntry.attachments = attachments;
+    } else {
+      if (notes) historyEntry.notes = notes;
+      if (budgetAvailable !== undefined)
+        historyEntry.budgetAvailable = budgetAvailable;
+    }
+
+    // 🔹 ACCOUNTANT BUDGET VALUES
+    if (user.role === UserRole.ACCOUNTANT) {
+      if (typeof budgetAllocated === 'number')
+        historyEntry.budgetAllocated = budgetAllocated;
+
+      if (typeof budgetSpent === 'number')
+        historyEntry.budgetSpent = budgetSpent;
+
+      if (typeof budgetAllocated === 'number' && typeof budgetSpent === 'number')
+        historyEntry.budgetBalance = budgetAllocated - budgetSpent;
+    }
+
+    // PREPARE UPDATE
+    const updateData: any = {
+      $push: { history: historyEntry },
+    };
+
     if (nextStatus !== previousStatus) {
       updateData.$set = { status: nextStatus };
     }
 
-    // Handle attachments at the request level for approve/reject actions
-    if (action !== 'forward' && attachments && attachments.length > 0) {
-      if (!updateData.$set) {
-        updateData.$set = {};
-      }
-      updateData.$set.attachments = [...requestRecord.attachments, ...attachments];
+    // Save accountant values to Request document
+    if (user.role === UserRole.ACCOUNTANT) {
+      if (!updateData.$set) updateData.$set = {};
+      updateData.$set.budgetAllocated = budgetAllocated;
+      updateData.$set.budgetSpent = budgetSpent;
+      updateData.$set.budgetBalance = budgetAllocated - budgetSpent;
+    }
+
+    // Add attachments (except forward)
+    if (action !== 'forward' && attachments?.length) {
+      if (!updateData.$set) updateData.$set = {};
+      updateData.$set.attachments = [
+        ...requestRecord.attachments,
+        ...attachments,
+      ];
     }
 
     const updatedRequest = await Request.findByIdAndUpdate(
       params.id,
       updateData,
       { new: true }
-    ).populate('requester', 'name email empId')
+    )
+      .populate('requester', 'name email empId')
       .populate('history.actor', 'name email empId');
 
     return NextResponse.json(updatedRequest);
   } catch (error) {
     console.error('Approve request error:', error);
-    return NextResponse.json({ error: 'Failed to process approval' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to process approval' },
+      { status: 500 }
+    );
   }
 }
