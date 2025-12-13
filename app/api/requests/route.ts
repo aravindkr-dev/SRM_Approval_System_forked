@@ -3,11 +3,42 @@ import connectDB from '../../../lib/mongodb';
 import Request from '../../../models/Request';
 import User from '../../../models/User';
 import AuditLog from '../../../models/AuditLog';
-import { getCurrentUser } from '../../../lib/auth';
+import { getCurrentUser, validateUserAction } from '../../../lib/auth';
 import { CreateRequestSchema } from '../../../lib/types';
 import { RequestStatus, ActionType, UserRole } from '../../../lib/types';
+import { filterRequestsByVisibility } from '../../../lib/request-visibility';
 import mongoose from 'mongoose';
 import { approvalEngine } from '../../../lib/approval-engine';
+
+// Function to get role-based filter for request visibility
+function getRoleBasedFilter(userRole: UserRole, userId: any, pendingOnly: boolean = false, isForDashboard: boolean = false) {
+  let filter: any = {};
+  
+  switch (userRole) {
+    case UserRole.REQUESTER:
+      // Requesters can only see their own requests
+      filter.requester = userId;
+      break;
+      
+    default:
+      // For non-requesters, be more inclusive especially for dashboard
+      if (isForDashboard) {
+        // For dashboard recent requests, show all requests to give approvers system overview
+        filter = {}; // No filter = all requests
+      } else if (pendingOnly) {
+        // For pending approvals, show all non-completed requests
+        filter.status = { 
+          $nin: [RequestStatus.APPROVED, RequestStatus.REJECTED] 
+        };
+      } else {
+        // For regular requests view, show all requests
+        filter = {}; // No filter = all requests
+      }
+      break;
+  }
+  
+  return filter;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,70 +58,58 @@ export async function GET(request: NextRequest) {
     
     let filter: any = {};
     
-    if (pendingApprovals) {
-      // For pending approvals, we need to find requests where the current user's role matches the required approver
-      // First, get all requests that are not in final states
-      filter.status = {
-        $nin: [RequestStatus.APPROVED, RequestStatus.REJECTED, RequestStatus.CLARIFICATION_REQUIRED]
-      };
-      
-      // Additional filtering based on user role for approvals
-      if (user.role !== UserRole.REQUESTER) {
-        // For non-requesters, we'll need to implement custom logic to filter by approver role
-        // This is a simplified approach - in a full implementation, you'd want to check the approval engine
-        // For now, we'll return all non-final requests for approvers to filter client-side
-      } else {
-        // For requesters, only show their own requests
-        if (mongoose.Types.ObjectId.isValid(user.id)) {
-          filter.requester = user.id;
-        } else {
-          const dbUser = await User.findOne({ email: user.email });
-          if (dbUser) {
-            filter.requester = dbUser._id;
-          }
-        }
-      }
+    // Get user's database record for proper filtering
+    let dbUser = null;
+    if (mongoose.Types.ObjectId.isValid(user.id)) {
+      dbUser = await User.findById(user.id);
     } else {
-      // Role-based filtering for regular requests
-      if (user.role === UserRole.REQUESTER) {
-        // For requesters, only show their own requests
-        if (mongoose.Types.ObjectId.isValid(user.id)) {
-          filter.requester = user.id;
-        } else {
-          const dbUser = await User.findOne({ email: user.email });
-          if (dbUser) {
-            filter.requester = dbUser._id;
-          }
-        }
+      dbUser = await User.findOne({ email: user.email });
+    }
+    
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    
+    // Get all requests and apply sophisticated visibility filtering
+    let baseQuery: any = {};
+    
+    // Apply basic filters first
+    if (college) {
+      baseQuery.college = college;
+    }
+
+    const allRequests = await Request.find(baseQuery)
+      .populate('requester', 'name email empId')
+      .populate('history.actor', 'name email empId')
+      .sort({ createdAt: -1 })
+      .lean(); // Convert to plain objects for better performance
+
+    // Apply role-based visibility filtering
+    let visibleRequests = filterRequestsByVisibility(
+      allRequests, 
+      user.role as UserRole, 
+      dbUser._id.toString()
+    );
+
+    // Apply status filtering based on visibility categories
+    if (status) {
+      if (status === 'pending') {
+        visibleRequests = visibleRequests.filter(req => req._visibility.category === 'pending');
+      } else if (status === 'approved') {
+        // Approved requests = only requests that have been fully approved by Chairman
+        visibleRequests = visibleRequests.filter(req => req.status === RequestStatus.APPROVED);
+      } else if (status === 'rejected') {
+        visibleRequests = visibleRequests.filter(req => req.status === RequestStatus.REJECTED);
+      } else {
+        // Filter by actual status
+        visibleRequests = visibleRequests.filter(req => req.status === status);
       }
     }
-    
-    if (status && status !== 'pending') {
-      filter.status = status;
-    }
-    
-    if (college) {
-      filter.college = college;
-    }
 
+    // Apply pagination
     const skip = (page - 1) * limit;
-    
-    const requests = await Request.find(filter)
-      .populate('requester', 'name email empId')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    // Filter requests for pending approvals based on user role
-    let filteredRequests = requests;
-    if (pendingApprovals && user.role !== UserRole.REQUESTER) {
-      filteredRequests = requests.filter(request => {
-        const requiredApprovers = approvalEngine.getRequiredApprover(request.status as RequestStatus);
-        return requiredApprovers.includes(user.role as UserRole);
-      });
-    }
-
-    const total = await Request.countDocuments(filter);
+    const filteredRequests = visibleRequests.slice(skip, skip + limit);
+    const total = visibleRequests.length;
 
     return NextResponse.json({
       requests: filteredRequests,
@@ -112,15 +131,39 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const user = await getCurrentUser();
     
-    if (!user || user.role !== UserRole.REQUESTER) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Enhanced security validation
+    const validation = validateUserAction(user, 'create_request');
+    if (!validation.allowed) {
+      // Log security violation attempt
+      console.warn(`Unauthorized request creation attempt by user ${user?.email || 'unknown'} with role ${user?.role || 'unknown'}: ${validation.reason}`);
+      
+      // Log to audit trail if user exists
+      if (user) {
+        await AuditLog.create({
+          requestId: null,
+          userId: user.id,
+          action: 'unauthorized_request_creation_attempt',
+          details: { 
+            userRole: user.role, 
+            userEmail: user.email,
+            reason: validation.reason,
+            timestamp: new Date(),
+            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+          },
+        });
+      }
+      
+      const statusCode = user ? 403 : 401;
+      const errorMessage = user ? `Forbidden: ${validation.reason}` : 'Unauthorized: Authentication required';
+      
+      return NextResponse.json({ error: errorMessage }, { status: statusCode });
     }
 
     const body = await request.json();
     const validatedData = CreateRequestSchema.parse(body);
 
     // Find the requester user (should already exist from authentication)
-    const requesterUser = await User.findOne({ email: user.email });
+    const requesterUser = await User.findOne({ email: user!.email });
     if (!requesterUser) {
       return NextResponse.json({ error: 'User not found. Please ensure you are properly authenticated.' }, { status: 404 });
     }
@@ -128,13 +171,13 @@ export async function POST(request: NextRequest) {
     const newRequest = await Request.create({
       ...validatedData,
       requester: requesterUser._id,
-      status: RequestStatus.SUBMITTED, // Directly submit instead of draft
+      status: RequestStatus.MANAGER_REVIEW, // Directly go to manager review
       history: [{
         action: ActionType.CREATE,
         actor: requesterUser._id,
         timestamp: new Date(),
-        notes: 'Request directly submitted',
-        newStatus: RequestStatus.SUBMITTED,
+        notes: 'Request created and forwarded to manager for review',
+        newStatus: RequestStatus.MANAGER_REVIEW,
       }],
     });
 

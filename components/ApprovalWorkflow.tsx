@@ -19,10 +19,12 @@ const getStatusBadgeClass = (status: string, isCurrent: boolean, isCompleted: bo
 
 const getStatusDisplayName = (status: string) => {
   const statusMap: Record<string, string> = {
-    'submitted': 'Submitted',
     'manager_review': 'Manager Review',
+    'parallel_verification': 'Parallel Verification',
     'sop_verification': 'SOP Verification',
     'budget_check': 'Budget Check',
+    'sop_completed': 'SOP Completed',
+    'budget_completed': 'Budget Completed',
     'institution_verified': 'Institution Verified',
     'vp_approval': 'VP Approval',
     'hoi_approval': 'HOI Approval',
@@ -45,15 +47,12 @@ const getStatusDisplayName = (status: string) => {
 const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({ currentStatus }) => {
   // Define the main approval workflow steps
   const workflowSteps = [
-    { id: 'submitted', name: 'Submitted' },
     { id: 'manager_review', name: 'Manager Review' },
-    { id: 'sop_verification', name: 'SOP Verification' },
-    { id: 'budget_check', name: 'Budget Check' },
+    { id: 'parallel_verification', name: 'Parallel Verification' },
     { id: 'institution_verified', name: 'Institution Verified' },
     { id: 'vp_approval', name: 'VP Approval' },
     { id: 'hoi_approval', name: 'HOI Approval' },
     { id: 'dean_review', name: 'Dean Review' },
-    { id: 'department_checks', name: 'Department Checks' },
     { id: 'dean_verification', name: 'Dean Verification' },
     { id: 'chief_director_approval', name: 'Chief Director Approval' },
     { id: 'chairman_approval', name: 'Chairman Approval' },
@@ -61,7 +60,10 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({ currentStatus }) =>
   ];
 
   // Check if current status is a clarification status
-  const isClarificationStatus = ['sop_clarification', 'budget_clarification', 'clarification_required'].includes(currentStatus);
+  const isClarificationStatus = ['sop_clarification', 'budget_clarification', 'clarification_required', 'department_checks'].includes(currentStatus);
+  
+  // Check if current status is a parallel verification status
+  const isParallelStatus = ['parallel_verification', 'sop_completed', 'budget_completed'].includes(currentStatus);
   
   // Find the index of the current status in main workflow
   const currentStatusIndex = workflowSteps.findIndex(step => step.id === currentStatus);
@@ -87,9 +89,33 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({ currentStatus }) =>
                   {getStatusDisplayName(currentStatus)}
                 </h4>
                 <p className="text-sm text-yellow-700">
-                  {currentStatus === 'sop_clarification' && 'Waiting for SOP verification clarification from SOP Verifier or Department (MMA/HR/Audit/IT)'}
-                  {currentStatus === 'budget_clarification' && 'Waiting for budget clarification from Accountant'}
+                  {currentStatus === 'sop_clarification' && 'Waiting for SOP verification clarification from Institution Manager'}
+                  {currentStatus === 'budget_clarification' && 'Waiting for budget clarification from Institution Manager'}
                   {currentStatus === 'clarification_required' && 'Waiting for clarification from Requester'}
+                  {currentStatus === 'department_checks' && 'Waiting for department clarification response'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Show parallel verification status if applicable */}
+        {isParallelStatus && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-lg font-medium text-blue-800">
+                  {getStatusDisplayName(currentStatus)}
+                </h4>
+                <p className="text-sm text-blue-700">
+                  {currentStatus === 'parallel_verification' && 'Both SOP Verifier and Accountant are working on verification simultaneously'}
+                  {currentStatus === 'sop_completed' && 'SOP verification complete. Waiting for budget verification to finish.'}
+                  {currentStatus === 'budget_completed' && 'Budget verification complete. Waiting for SOP verification to finish.'}
                 </p>
               </div>
             </div>

@@ -2,18 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserRole } from '../../../lib/types';
-import { approvalEngine } from '../../../lib/approval-engine';
-
-interface AuthUser {
-  id: string;
-  email: string;
-  name: string;
-  empId?: string;
-  role: UserRole;
-  college?: string;
-  department?: string;
-}
 
 interface Request {
   _id: string;
@@ -29,6 +17,7 @@ interface Request {
     name: string;
     email: string;
   };
+  history?: any[];
 }
 
 export default function ApprovalsPage() {
@@ -36,118 +25,91 @@ export default function ApprovalsPage() {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     fetchCurrentUser();
+    fetchApprovals();
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchPendingApprovals();
-    }
-  }, [currentUser]);
-
   const fetchCurrentUser = async () => {
+    console.log('[DEBUG] fetchCurrentUser called in approvals page');
     try {
-      const response = await fetch('/api/auth/me');
-      if (!response.ok) {
-        throw new Error('Failed to fetch current user');
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('[DEBUG] Current user in approvals page:', userData);
+        setCurrentUser(userData);
+        
+        // Redirect requesters to their requests page
+        if (userData.role === 'requester') {
+          console.log('[DEBUG] User is requester, but allowing access for testing');
+          // Temporarily comment out redirect for testing
+          // router.push('/dashboard/requests');
+          // return;
+        }
+        
+        console.log('[DEBUG] User is not requester, proceeding with approvals page');
       }
-      const user = await response.json();
-      setCurrentUser(user);
     } catch (err) {
       console.error('Error fetching current user:', err);
-      setError('Failed to load user data');
     }
   };
 
-  const fetchPendingApprovals = async () => {
+  const fetchApprovals = async () => {
+    console.log('[DEBUG] fetchApprovals called');
     try {
       setLoading(true);
-      // Fetch requests that need approval based on user role
-      const response = await fetch('/api/requests?pendingApprovals=true');
+      setError(null);
+      
+      console.log('[DEBUG] Making request to /api/approvals');
+      const response = await fetch('/api/approvals', {
+        credentials: 'include'
+      });
+      
+      console.log('[DEBUG] Response status:', response.status);
       
       if (!response.ok) {
         throw new Error('Failed to fetch pending approvals');
       }
-      
+
       const data = await response.json();
-      setRequests(data.requests);
+      console.log('[DEBUG] Response data:', data);
+      setRequests(data.requests || []);
     } catch (err) {
-      console.error('Error fetching pending approvals:', err);
-      setError('Failed to load pending approvals');
+      console.error('Error fetching approvals:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load approvals');
     } finally {
       setLoading(false);
     }
   };
 
   const getStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status) {
       case 'approved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-700';
       case 'rejected':
-        return 'bg-red-100 text-red-800';
-      case 'draft':
-        return 'bg-gray-100 text-gray-800';
-      case 'submitted':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-red-100 text-red-700';
       case 'manager_review':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'budget_check':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-blue-100 text-blue-700';
+      case 'parallel_verification':
+        return 'bg-yellow-100 text-yellow-700';
       case 'vp_approval':
-        return 'bg-indigo-100 text-indigo-800';
-      case 'hoi_approval':
-        return 'bg-pink-100 text-pink-800';
+        return 'bg-purple-100 text-purple-700';
       case 'dean_review':
-        return 'bg-orange-100 text-orange-800';
-      case 'department_checks':
-        return 'bg-teal-100 text-teal-800';
-      case 'dean_verification':
-        return 'bg-cyan-100 text-cyan-800';
-      case 'chief_director_approval':
-        return 'bg-amber-100 text-amber-800';
-      case 'chairman_approval':
-        return 'bg-emerald-100 text-emerald-800';
-      case 'clarification_required':
-        return 'bg-rose-100 text-rose-800';
-      case 'sop_clarification':
-        return 'bg-red-100 text-red-800';
-      case 'budget_clarification':
-        return 'bg-red-100 text-red-800';
-      case 'department_clarification':
-        return 'bg-red-100 text-red-800';
+        return 'bg-indigo-100 text-indigo-700';
       default:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
   const getStatusDisplayName = (status: string) => {
-    const statusMap: Record<string, string> = {
-      'draft': 'Draft',
-      'submitted': 'Submitted',
-      'manager_review': 'Manager Review',
-      'budget_check': 'Budget Check',
-      'vp_approval': 'VP Approval',
-      'hoi_approval': 'HOI Approval',
-      'dean_review': 'Dean Review',
-      'department_checks': 'Department Checks',
-      'dean_verification': 'Dean Verification',
-      'chief_director_approval': 'Chief Director Approval',
-      'chairman_approval': 'Chairman Approval',
-      'approved': 'Approved',
-      'rejected': 'Rejected',
-      'clarification_required': 'Clarification Required',
-      'sop_clarification': 'SOP Clarification',
-      'budget_clarification': 'Budget Clarification',
-      'department_clarification': 'Department Clarification'
-    };
-    
-    return statusMap[status.toLowerCase()] || status;
+    return status.replace(/_/g, ' ').toUpperCase();
   };
 
-  if (loading) {
+  if (loading || !currentUser) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -155,76 +117,145 @@ export default function ApprovalsPage() {
     );
   }
 
+  // Show access denied for requesters (temporarily disabled for testing)
+  if (currentUser.role === 'requester') {
+    console.log('[DEBUG] Requester accessing approvals page - allowing for testing');
+    // Temporarily allow requesters to see approvals page for testing
+    /*
+    return (
+      <div className="max-w-4xl mx-auto p-4 sm:p-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+          <svg className="mx-auto h-12 w-12 text-blue-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h3 className="text-lg font-medium text-blue-800 mb-2">Redirecting to Your Requests</h3>
+          <p className="text-blue-700 mb-4">As a requester, you should view your submitted requests instead of approvals.</p>
+          <button
+            onClick={() => router.push('/dashboard/requests')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Go to My Requests
+          </button>
+        </div>
+      </div>
+    );
+    */
+  }
+
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pending Approvals</h1>
-          <p className="text-gray-600">Requests requiring your approval</p>
+    <div className="max-w-6xl mx-auto p-4 sm:p-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8 gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+            Pending Approvals
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
+            Requests waiting for your approval
+          </p>
+          {currentUser && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              Role: <span className="font-medium">{currentUser.role?.replace('_', ' ').toUpperCase()}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+          <button
+            onClick={fetchApprovals}
+            className="px-3 sm:px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 shadow-sm transition text-sm sm:text-base active:scale-95"
+          >
+            <span className="hidden sm:inline">Refresh</span>
+            <span className="sm:hidden">↻</span>
+          </button>
         </div>
       </div>
 
+      {/* Error Message */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-red-800">{error}</p>
+        <div className="mb-4 sm:mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
         </div>
       )}
 
+      {/* No Approvals */}
       {requests.length === 0 ? (
-        <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <div className="text-center py-12 sm:py-16 bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100">
+          <svg
+            className="mx-auto h-12 w-12 sm:h-14 sm:w-14 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No pending approvals</h3>
-          <p className="mt-1 text-sm text-gray-500">There are currently no requests requiring your approval.</p>
+          <h3 className="mt-4 text-base sm:text-lg font-semibold text-gray-900">
+            No pending approvals
+          </h3>
+          <p className="text-sm sm:text-base text-gray-500 mt-1">
+            You don't have any requests waiting for your approval at the moment.
+          </p>
         </div>
       ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        /* Approvals List */
+        <div className="bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg border border-gray-100">
+          {/* Results Summary */}
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <p className="text-xs sm:text-sm text-gray-600">
+              {requests.length} request{requests.length !== 1 ? 's' : ''} waiting for your approval
+            </p>
+          </div>
+
           <ul className="divide-y divide-gray-200">
             {requests.map((request) => (
               <li key={request._id}>
-                <div 
-                  className="block hover:bg-gray-50 cursor-pointer"
+                <div
+                  className="hover:bg-gray-50 hover:scale-[1.01] transition cursor-pointer rounded-xl p-3 sm:p-4 active:scale-[0.99]"
                   onClick={() => router.push(`/dashboard/requests/${request._id}`)}
                 >
-                  <div className="px-4 py-4 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-blue-600 truncate">{request.title}</p>
-                      <div className="ml-2 flex-shrink-0 flex">
-                        <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(request.status)}`}>
-                          {getStatusDisplayName(request.status)}
-                        </p>
-                      </div>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base sm:text-lg font-semibold text-blue-700 truncate">
+                        {request.title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        Requested by: <span className="font-medium">{request.requester.name}</span>
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">
+                        {request.college} • {request.department}
+                      </p>
                     </div>
-                    <div className="mt-2 sm:flex sm:justify-between">
-                      <div className="sm:flex">
-                        <p className="flex items-center text-sm text-gray-500">
-                          {request.purpose.substring(0, 100)}{request.purpose.length > 100 ? '...' : ''}
-                        </p>
-                      </div>
-                      <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                        <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                        </svg>
-                        <p>
-                          Created on {new Date(request.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex text-sm text-gray-500">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+
+                    <div className="flex flex-wrap gap-2 items-center justify-between sm:justify-end flex-shrink-0">
+                      {/* Pending approval badge */}
+                      <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium whitespace-nowrap">
+                        ⏳ Awaiting Your Approval
+                      </span>
+                      
+                      <span className="px-2 sm:px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold whitespace-nowrap">
                         ₹{request.costEstimate.toLocaleString()}
                       </span>
-                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        {request.college} - {request.department}
-                      </span>
-                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        {request.expenseCategory}
+                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${getStatusBadgeClass(request.status)}`}>
+                        {getStatusDisplayName(request.status)}
                       </span>
                     </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      Requested by: {request.requester.name} ({request.requester.email})
-                    </div>
+                  </div>
+
+                  {/* Meta info */}
+                  <p className="text-xs sm:text-sm text-gray-600 mt-2 line-clamp-2">
+                    {request.purpose.substring(0, 120)}
+                    {request.purpose.length > 120 && '...'}
+                  </p>
+
+                  <div className="mt-3 flex justify-between items-center">
+                    <span className="text-xs text-gray-400">
+                      Created: {new Date(request.createdAt).toLocaleDateString()}
+                    </span>
+                    <span className="text-xs text-blue-600 font-medium">
+                      Click to review →
+                    </span>
                   </div>
                 </div>
               </li>

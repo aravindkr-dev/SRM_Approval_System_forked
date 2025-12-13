@@ -67,3 +67,39 @@ export function canApproveRequest(userRole: UserRole, requestStatus: string): bo
 
   return approvalMatrix[requestStatus]?.includes(userRole) || false;
 }
+
+export function canCreateRequest(userRole: UserRole): boolean {
+  return userRole === UserRole.REQUESTER;
+}
+
+export function validateUserAction(user: AuthUser | null, action: 'create_request' | 'approve_request', context?: any): { allowed: boolean; reason?: string } {
+  if (!user) {
+    return { allowed: false, reason: 'User not authenticated' };
+  }
+
+  switch (action) {
+    case 'create_request':
+      if (!canCreateRequest(user.role)) {
+        return { 
+          allowed: false, 
+          reason: `User role '${user.role}' is not authorized to create requests. Only requesters can create requests.` 
+        };
+      }
+      return { allowed: true };
+      
+    case 'approve_request':
+      if (!context?.requestStatus) {
+        return { allowed: false, reason: 'Request status required for approval validation' };
+      }
+      if (!canApproveRequest(user.role, context.requestStatus)) {
+        return { 
+          allowed: false, 
+          reason: `User role '${user.role}' is not authorized to approve requests in status '${context.requestStatus}'` 
+        };
+      }
+      return { allowed: true };
+      
+    default:
+      return { allowed: false, reason: 'Unknown action' };
+  }
+}

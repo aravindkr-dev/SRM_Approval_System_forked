@@ -14,8 +14,6 @@ const getStatusBadgeClass = (status: string) => {
       return 'bg-green-100 text-green-800';
     case 'rejected':
       return 'bg-red-100 text-red-800';
-    case 'submitted':
-      return 'bg-blue-100 text-blue-800';
     case 'manager_review':
       return 'bg-yellow-100 text-yellow-800';
     case 'sop_verification':
@@ -70,7 +68,6 @@ const getActionBadgeClass = (action: string) => {
 
 const getStatusDisplayName = (status: string) => {
   const statusMap: Record<string, string> = {
-    'submitted': 'Submitted',
     'manager_review': 'Manager Review',
     'sop_verification': 'SOP Verification',
     'budget_check': 'Budget Check',
@@ -157,36 +154,38 @@ const ApprovalHistory: React.FC<ApprovalHistoryProps> = ({ history, currentStatu
                     </div>
                   </div>
                   <div className="ml-4 flex-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getActionBadgeClass(historyItem.action)}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex flex-col xs:flex-row xs:items-center gap-2">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getActionBadgeClass(historyItem.action)} self-start xs:self-auto`}>
                           {getActionDisplayName(historyItem.action)}
                         </span>
-                        <span className="ml-3 text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium text-gray-900">
                           {historyItem.actor.name}
                         </span>
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-xs sm:text-sm text-gray-500">
                         {new Date(historyItem.timestamp).toLocaleString()}
                       </div>
                     </div>
                     
                     {/* Status Change Information */}
                     {historyItem.previousStatus && historyItem.newStatus && historyItem.previousStatus !== historyItem.newStatus && historyItem.previousStatus.toLowerCase() !== 'draft' ? (
-                      <div className="mt-2 flex items-center text-sm">
+                      <div className="mt-2 flex flex-col xs:flex-row xs:items-center gap-1 text-sm">
                         <span className="text-gray-500">Status changed from </span>
-                        <span className={`ml-1 px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(historyItem.previousStatus)}`}>
-                          {getStatusDisplayName(historyItem.previousStatus)}
-                        </span>
-                        <span className="mx-1 text-gray-500">to</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(historyItem.newStatus)}`}>
-                          {getStatusDisplayName(historyItem.newStatus)}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(historyItem.previousStatus)}`}>
+                            {getStatusDisplayName(historyItem.previousStatus)}
+                          </span>
+                          <span className="text-gray-500">to</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(historyItem.newStatus)}`}>
+                            {getStatusDisplayName(historyItem.newStatus)}
+                          </span>
+                        </div>
                       </div>
-                    ) : historyItem.previousStatus && historyItem.newStatus && historyItem.previousStatus.toLowerCase() === 'draft' && historyItem.newStatus.toLowerCase() === 'submitted' ? (
-                      <div className="mt-2 flex items-center text-sm">
+                    ) : historyItem.action === 'create' && historyItem.newStatus && historyItem.newStatus.toLowerCase() === 'manager_review' ? (
+                      <div className="mt-2 flex flex-col xs:flex-row xs:items-center gap-1 text-sm">
                         <span className="text-gray-500">Status: </span>
-                        <span className={`ml-1 px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(historyItem.newStatus)}`}>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(historyItem.newStatus)}`}>
                           {getStatusDisplayName(historyItem.newStatus)}
                         </span>
                       </div>
@@ -221,29 +220,27 @@ const ApprovalHistory: React.FC<ApprovalHistoryProps> = ({ history, currentStatu
                     {/* Attachments */}
                     {historyItem.attachments && historyItem.attachments.length > 0 && (
                       <div className="mt-3">
-                        <p className="text-sm font-medium text-gray-700">Attachments:</p>
-                        <ul className="mt-1 text-sm text-gray-600 border border-gray-200 rounded-md divide-y divide-gray-200">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Attachments:</p>
+                        <div className="space-y-2">
                           {historyItem.attachments.map((attachment, index) => (
-                            <li key={index} className="pl-3 pr-4 py-2 flex items-center justify-between">
-                              <div className="flex items-center w-0 flex-1">
+                            <div key={index} className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 p-2 border border-gray-200 rounded-md">
+                              <div className="flex items-center min-w-0 flex-1">
                                 <svg className="flex-shrink-0 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
                                 </svg>
-                                <span className="ml-2 flex-1 w-0 truncate">{getFileNameFromUrl(attachment)}</span>
+                                <span className="ml-2 text-sm text-gray-600 truncate">{getFileNameFromUrl(attachment)}</span>
                               </div>
-                              <div className="ml-4 flex-shrink-0">
-                                <a 
-                                  href={attachment} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="font-medium text-blue-600 hover:text-blue-800"
-                                >
-                                  View
-                                </a>
-                              </div>
-                            </li>
+                              <a 
+                                href={attachment} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 self-start xs:self-auto whitespace-nowrap"
+                              >
+                                View File
+                              </a>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     )}
                   </div>

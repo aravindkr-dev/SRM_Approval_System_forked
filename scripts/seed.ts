@@ -161,7 +161,6 @@ function getRoleDisplayName(role: UserRole): string {
 
 function getRandomStatus(): RequestStatus {
   const statuses = [
-    RequestStatus.SUBMITTED,
     RequestStatus.MANAGER_REVIEW,
     RequestStatus.SOP_VERIFICATION,
     RequestStatus.BUDGET_CHECK,

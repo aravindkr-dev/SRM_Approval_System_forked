@@ -19,9 +19,13 @@ export enum UserRole {
 export enum RequestStatus {
   SUBMITTED = 'submitted',
   MANAGER_REVIEW = 'manager_review',
+  // Parallel verification statuses
+  PARALLEL_VERIFICATION = 'parallel_verification', // Both SOP and Budget verification in progress
   SOP_VERIFICATION = 'sop_verification',
   BUDGET_CHECK = 'budget_check',
-  INSTITUTION_VERIFIED = 'institution_verified',
+  SOP_COMPLETED = 'sop_completed', // SOP verification done, waiting for budget
+  BUDGET_COMPLETED = 'budget_completed', // Budget verification done, waiting for SOP
+  INSTITUTION_VERIFIED = 'institution_verified', // Both verifications complete
   VP_APPROVAL = 'vp_approval',
   HOI_APPROVAL = 'hoi_approval',
   DEAN_REVIEW = 'dean_review',
@@ -32,8 +36,6 @@ export enum RequestStatus {
   APPROVED = 'approved',
   REJECTED = 'rejected',
   CLARIFICATION_REQUIRED = 'clarification_required',
-  SOP_CLARIFICATION = 'sop_clarification',
-  BUDGET_CLARIFICATION = 'budget_clarification',
   DEPARTMENT_CLARIFICATION = 'department_clarification', // For Dean's clarifications to MMA, HR, Audit, IT
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -91,16 +92,12 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <input
+              <PasswordInput
                 id="password"
-                type="password"
-                required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
+                required
                 placeholder="••••••••"
-                className="mt-1 block w-full border border-gray-400 rounded-lg px-3 py-2 bg-white shadow-sm
-                           placeholder-gray-500 text-gray-900
-                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               />
             </div>
 

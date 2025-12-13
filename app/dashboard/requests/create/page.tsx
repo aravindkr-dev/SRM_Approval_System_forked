@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CreateRequestSchema } from '../../../../lib/types';
+import { CreateRequestSchema, UserRole } from '../../../../lib/types';
+import { AuthUser } from '../../../../lib/auth';
 import { z } from 'zod';
+import CostEstimateInput from '../../../../components/CostEstimateInput';
 
 type CreateRequestFormData = z.infer<typeof CreateRequestSchema>;
 
@@ -31,15 +33,51 @@ export default function CreateRequestPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<CreateRequestFormData>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<CreateRequestFormData>({
     resolver: zodResolver(CreateRequestSchema),
-    defaultValues: { attachments: [] }
+    defaultValues: { attachments: [], costEstimate: 0 }
   });
+
+  const costEstimate = watch('costEstimate');
+
+  // Check authentication and role on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          router.push('/login');
+          return;
+        }
+        
+        const userData = await response.json();
+        
+        // Ensure only requesters can access this page
+        if (userData.role !== UserRole.REQUESTER) {
+          router.push('/dashboard');
+          return;
+        }
+        
+        setUser(userData);
+      } catch (error) {
+        router.push('/login');
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   /* 🔹 FORM SUBMIT HANDLER */
   const onSubmit = async (data: CreateRequestFormData) => {
@@ -119,6 +157,20 @@ export default function CreateRequestPage() {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // This should not render if user is not a requester (redirect happens in useEffect)
+  if (!user || user.role !== UserRole.REQUESTER) {
+    return null;
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
 
@@ -185,12 +237,12 @@ export default function CreateRequestPage() {
 
           {/* Cost Estimate */}
           <div>
-            <label className="block text-sm font-medium text-gray-700">Cost Estimate (₹)</label>
-            <input
-              type="number"
-              inputMode="decimal"
-              {...register("costEstimate", { valueAsNumber: true })}
-              className="mt-1 block w-full rounded-md border p-2 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            <label className="block text-sm font-medium text-gray-700">Cost Estimate</label>
+            <CostEstimateInput
+              value={costEstimate || 0}
+              onChange={(value) => setValue('costEstimate', value)}
+              error={errors.costEstimate?.message}
+              className="mt-1"
             />
           </div>
 

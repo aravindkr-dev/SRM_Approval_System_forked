@@ -14,6 +14,9 @@ const approvalHistorySchema = new mongoose.Schema({
   budgetAllocated: { type: Number },
   budgetSpent: { type: Number },
   budgetBalance: { type: Number },
+  // 🔹 Clarification tracking
+  clarificationTarget: { type: String }, // For Dean -> Department clarifications
+  clarificationType: { type: String }, // For Institution Manager -> SOP/Accountant
   timestamp: { type: Date, default: Date.now },
 });
 
@@ -41,7 +44,7 @@ const requestSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: Object.values(RequestStatus),
-      default: RequestStatus.SUBMITTED,
+      default: RequestStatus.MANAGER_REVIEW,
     },
     history: [approvalHistorySchema],
   },

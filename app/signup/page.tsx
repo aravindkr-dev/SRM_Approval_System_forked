@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '../../lib/types';
+import PasswordInput from '../../components/PasswordInput';
 
 const roleOptions = [
   { value: UserRole.REQUESTER, label: 'Requester/HOD' },
@@ -153,25 +154,21 @@ export default function SignupPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Password *</label>
-              <input
-                type="password"
-                required
+              <PasswordInput
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
+                required
                 placeholder="••••••••"
-                className={inputClass}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Confirm Password *</label>
-              <input
-                type="password"
-                required
+              <PasswordInput
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={setConfirmPassword}
+                required
                 placeholder="••••••••"
-                className={inputClass}
               />
             </div>
 
